@@ -43,7 +43,8 @@ export function usePersistedColumnOrder(
   const hasInstanceKey = instanceKey !== undefined && instanceKey !== null
   const storageKey = hasInstanceKey ? `${BASE_STORAGE_KEY}:${instanceKey}` : BASE_STORAGE_KEY
 
-  useDropLegacyKey(BASE_STORAGE_KEY, hasInstanceKey)
+  // A named table such as "search" never had the shared key, so only an instance id drops it.
+  useDropLegacyKey(BASE_STORAGE_KEY, typeof instanceKey === "number")
 
   const defaultsJson = JSON.stringify(defaultOrder)
   const defaultValue = useMemo<ColumnOrderState>(() => JSON.parse(defaultsJson), [defaultsJson])
