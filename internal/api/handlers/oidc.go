@@ -65,6 +65,7 @@ type OIDCConfigResponse struct {
 	Enabled             bool   `json:"enabled"`
 	AuthorizationURL    string `json:"authorizationUrl"`
 	DisableBuiltInLogin bool   `json:"disableBuiltInLogin"`
+	AutoLogin           bool   `json:"autoLogin"`
 	IssuerURL           string `json:"issuerUrl"`
 }
 
@@ -227,7 +228,7 @@ func (h *OIDCHandler) handleCallback(w http.ResponseWriter, r *http.Request) {
 	expectedState := h.sessionManager.GetString(r.Context(), "oidc_state")
 	if expectedState == "" {
 		log.Error().Msg("no state found in session")
-		RespondError(w, http.StatusBadRequest, "invalid state: no state found in session")
+		h.redirectToLoginWithError(w, r)
 		return
 	}
 
@@ -237,7 +238,7 @@ func (h *OIDCHandler) handleCallback(w http.ResponseWriter, r *http.Request) {
 			Str("expected", expectedState).
 			Str("got", actualState).
 			Msg("state did not match")
-		RespondError(w, http.StatusBadRequest, "invalid state: state mismatch")
+		h.redirectToLoginWithError(w, r)
 		return
 	}
 
@@ -250,8 +251,11 @@ func (h *OIDCHandler) handleCallback(w http.ResponseWriter, r *http.Request) {
 
 	code := r.URL.Query().Get("code")
 	if code == "" {
-		log.Error().Msg("authorization code is missing from callback request")
-		RespondError(w, http.StatusBadRequest, "authorization code is missing from callback request")
+		log.Error().
+			Str("provider_error", r.URL.Query().Get("error")).
+			Str("provider_error_description", r.URL.Query().Get("error_description")).
+			Msg("authorization code is missing from callback request")
+		h.redirectToLoginWithError(w, r)
 		return
 	}
 
@@ -263,28 +267,28 @@ func (h *OIDCHandler) handleCallback(w http.ResponseWriter, r *http.Request) {
 	oauth2Token, err := h.oauthConfig.Exchange(r.Context(), code, exchangeOpts...)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to exchange token")
-		RespondError(w, http.StatusInternalServerError, fmt.Sprintf("failed to exchange token: %v", err))
+		h.redirectToLoginWithError(w, r)
 		return
 	}
 
 	rawIDToken, ok := oauth2Token.Extra("id_token").(string)
 	if !ok {
 		log.Error().Msg("no id_token found in oauth2 token")
-		RespondError(w, http.StatusInternalServerError, "no id_token found in oauth2 token")
+		h.redirectToLoginWithError(w, r)
 		return
 	}
 
 	idToken, err := h.verifier.Verify(r.Context(), rawIDToken)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to verify ID Token")
-		RespondError(w, http.StatusUnauthorized, fmt.Sprintf("failed to verify ID Token: %v", err))
+		h.redirectToLoginWithError(w, r)
 		return
 	}
 
 	var claims OIDCClaims
 	if err := idToken.Claims(&claims); err != nil {
 		log.Error().Err(err).Msg("failed to parse claims from ID token")
-		RespondError(w, http.StatusInternalServerError, fmt.Sprintf("failed to parse claims from ID token: %v", err))
+		h.redirectToLoginWithError(w, r)
 		return
 	}
 
@@ -358,7 +362,7 @@ func (h *OIDCHandler) handleCallback(w http.ResponseWriter, r *http.Request) {
 	// Create new session
 	if err := renewSessionToken(r.Context(), h.sessionManager); err != nil {
 		log.Error().Err(err).Msgf("Auth: Failed to renew session token for username: [%s] ip: %s", username, r.RemoteAddr)
-		RespondError(w, http.StatusInternalServerError, "could not renew session token")
+		h.redirectToLoginWithError(w, r)
 		return
 	}
 
@@ -370,29 +374,7 @@ func (h *OIDCHandler) handleCallback(w http.ResponseWriter, r *http.Request) {
 	h.sessionManager.Put(r.Context(), "profile_picture", claims.Picture)
 	h.sessionManager.RememberMe(r.Context(), true)
 
-	// Redirect to the frontend
-	// Prefer relative URLs for security, but support absolute URLs for development
-	frontendURL := "/dashboard" // Safe default
-
-	// Only construct absolute URLs if explicitly configured
-	if h.config.OIDCRedirectURL != "" {
-		// Parse the redirect URL to get the frontend base
-		if idx := strings.Index(h.config.OIDCRedirectURL, "/api/auth/oidc/callback"); idx > 0 {
-			candidateURL := h.config.OIDCRedirectURL[:idx] + "/dashboard"
-
-			// Validate the URL to ensure it's pointing to our application
-			if isValidRedirectURL(candidateURL, h.config.OIDCRedirectURL) {
-				frontendURL = candidateURL
-			}
-		}
-	} else if h.config.BaseURL != "" && h.config.BaseURL != "/" {
-		// Use configured base URL
-		base := strings.TrimSuffix(h.config.BaseURL, "/")
-		if base == "" {
-			base = "/"
-		}
-		frontendURL = base + "/dashboard"
-	}
+	frontendURL := h.frontendURL("/dashboard")
 
 	log.Trace().
 		Str("redirect_url", frontendURL).
@@ -404,6 +386,38 @@ func (h *OIDCHandler) handleCallback(w http.ResponseWriter, r *http.Request) {
 		Msg("redirecting to frontend after OIDC callback")
 
 	http.Redirect(w, r, frontendURL, http.StatusFound)
+}
+
+// frontendURL returns the URL of a frontend path. It prefers relative URLs for
+// security, and builds an absolute one only from the configured redirect URL.
+func (h *OIDCHandler) frontendURL(path string) string {
+	if h.config.OIDCRedirectURL != "" {
+		// Parse the redirect URL to get the frontend base
+		if idx := strings.Index(h.config.OIDCRedirectURL, "/api/auth/oidc/callback"); idx > 0 {
+			candidateURL := h.config.OIDCRedirectURL[:idx] + path
+
+			// Validate the URL to ensure it's pointing to our application
+			if isValidRedirectURL(candidateURL, h.config.OIDCRedirectURL) {
+				return candidateURL
+			}
+		}
+	} else if h.config.BaseURL != "" && h.config.BaseURL != "/" {
+		// Use configured base URL
+		base := strings.TrimSuffix(h.config.BaseURL, "/")
+		if base == "" {
+			base = "/"
+		}
+		return base + path
+	}
+
+	return path
+}
+
+// redirectToLoginWithError sends the browser to the login page after a failed
+// callback. The IdP redirect lands on this endpoint directly, so a JSON error
+// would leave the user on a blank API response instead of the app.
+func (h *OIDCHandler) redirectToLoginWithError(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, h.frontendURL("/login?oidc_error=1"), http.StatusFound)
 }
 
 // isValidRedirectURL validates that the redirect URL is safe
@@ -472,6 +486,7 @@ func (h *OIDCHandler) GetConfigResponse() (OIDCConfigResponse, string, string, e
 		Enabled:             h.config.OIDCEnabled,
 		AuthorizationURL:    authURL,
 		DisableBuiltInLogin: h.config.OIDCDisableBuiltInLogin,
+		AutoLogin:           h.config.OIDCAutoLogin,
 		IssuerURL:           h.config.OIDCIssuer,
 	}, state, verifier, nil
 }

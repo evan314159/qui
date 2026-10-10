@@ -168,6 +168,7 @@ func (c *AppConfig) defaults() {
 	c.viper.SetDefault("oidcClientSecret", "")
 	c.viper.SetDefault("oidcRedirectUrl", "")
 	c.viper.SetDefault("oidcDisableBuiltInLogin", false)
+	c.viper.SetDefault("oidcAutoLogin", false)
 }
 
 func (c *AppConfig) load(configDirOrPath string) error {
@@ -276,6 +277,7 @@ func (c *AppConfig) loadFromEnv() {
 	c.bindOrReadFromFile("oidcClientSecret", envPrefix+"OIDC_CLIENT_SECRET")
 	c.viper.BindEnv("oidcRedirectUrl", envPrefix+"OIDC_REDIRECT_URL")
 	c.viper.BindEnv("oidcDisableBuiltInLogin", envPrefix+"OIDC_DISABLE_BUILT_IN_LOGIN")
+	c.viper.BindEnv("oidcAutoLogin", envPrefix+"OIDC_AUTO_LOGIN")
 }
 
 func (c *AppConfig) watchConfig() {
@@ -410,6 +412,7 @@ func (c *AppConfig) hydrateConfigFromViper() {
 	c.Config.OIDCClientSecret = c.viper.GetString("oidcClientSecret")
 	c.Config.OIDCRedirectURL = c.viper.GetString("oidcRedirectUrl")
 	c.Config.OIDCDisableBuiltInLogin = c.viper.GetBool("oidcDisableBuiltInLogin")
+	c.Config.OIDCAutoLogin = c.viper.GetBool("oidcAutoLogin")
 }
 
 func (c *AppConfig) loadAllowedHosts() error {
@@ -733,6 +736,9 @@ sessionSecret = "{{ .sessionSecret }}"
 
 # Disable Built-In Login Form (only works when OIDC is enabled)
 #oidcDisableBuiltInLogin = false
+
+# Send the browser to the OIDC provider from the login page without a click (only works when OIDC is enabled)
+#oidcAutoLogin = false
 `
 
 	// Prepare template data

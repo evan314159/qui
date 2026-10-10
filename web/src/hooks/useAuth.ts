@@ -5,6 +5,7 @@
 
 import { navigateAfterAuth } from "@/lib/add-intent"
 import { api } from "@/lib/api"
+import { skipOIDCAutoLoginOnce } from "@/lib/oidc-autologin"
 import type { User } from "@/types"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
@@ -45,6 +46,7 @@ export function useAuth() {
   const logoutMutation = useMutation({
     mutationFn: () => api.logout(),
     onSuccess: () => {
+      skipOIDCAutoLoginOnce()
       queryClient.setQueryData(["auth", "user"], null)
       queryClient.clear()
       navigate({ to: "/login" })

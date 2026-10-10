@@ -91,6 +91,7 @@ qui watches `config.toml` for changes. qui applies some settings immediately, fo
 | `oidcClientSecret` | `QUI__OIDC_CLIENT_SECRET` / `QUI__OIDC_CLIENT_SECRET_FILE` | string | empty | OIDC client secret. Restart required. |
 | `oidcRedirectUrl` | `QUI__OIDC_REDIRECT_URL` | string | empty | Must match the provider redirect URI. If you use a reverse proxy, include `baseUrl`. Restart required. |
 | `oidcDisableBuiltInLogin` | `QUI__OIDC_DISABLE_BUILT_IN_LOGIN` | bool | `false` | If OIDC is enabled, this hides the local username and password form. Restart required. |
+| `oidcAutoLogin` | `QUI__OIDC_AUTO_LOGIN` | bool | `false` | If OIDC is enabled, the login page sends the browser to the provider without a click. After a logout, a failed sign-in, or a sign-in that did not stick, it stays on screen. See [OIDC](./oidc.md#automatic-sign-in). Restart required. |
 
 ## Authentication
 
