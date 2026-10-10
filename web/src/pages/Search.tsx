@@ -4,6 +4,7 @@
  */
 
 import { SearchResultCard } from "@/components/search/SearchResultCard"
+import { SearchTableHeaderCell } from "@/components/search/SearchTableHeaderCell"
 import { AddTorrentDialog, type AddTorrentDropPayload } from "@/components/torrents/AddTorrentDialog"
 import { ColumnFilterPopover } from "@/components/torrents/ColumnFilterPopover"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
@@ -11,26 +12,34 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { ColumnOrderList } from "@/components/ui/column-order-list"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { useColumnDnd } from "@/hooks/torrent-table/useColumnDnd"
 import { useDateTimeFormatters } from "@/hooks/useDateTimeFormatters"
 import { useInstances } from "@/hooks/useInstances"
+import { usePersistedColumnSizing } from "@/hooks/usePersistedColumnSizing"
+import { usePersistedColumnVisibility } from "@/hooks/usePersistedColumnVisibility"
 import { api } from "@/lib/api"
 import type { ColumnFilter } from "@/lib/column-filter-utils"
 import { filterSearchResult } from "@/lib/column-filter-utils"
 import { getCategoriesForSearchType, getSearchTypeLabel, getSearchTypeOptions, inferSearchTypeFromCategories, resolveSuggestionIndexerIds, type SearchType } from "@/lib/search-derived-params"
 import { extractImdbId, extractTvdbId } from "@/lib/search-id-parsing"
+import { buildSearchGridTemplate, getSearchTableMinWidth, getVisibleSearchColumns, SEARCH_TABLE_COLUMN_IDS, SEARCH_TABLE_TITLE_COLUMN, type SearchTableColumnId, type SearchTableColumnWidths } from "@/lib/search-table-columns"
 import { cn, formatBytes } from "@/lib/utils"
 import type { TorznabIndexer, TorznabRecentSearch, TorznabSearchRequest, TorznabSearchResponse, TorznabSearchResult } from "@/types"
+import { closestCenter, DndContext } from "@dnd-kit/core"
+import { restrictToHorizontalAxis } from "@dnd-kit/modifiers"
+import { horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable"
 import { Link } from "@tanstack/react-router"
 import { useVirtualizer } from "@tanstack/react-virtual"
-import { Check, ChevronDown, ChevronUp, Download, ExternalLink, Plus, RefreshCw, Search as SearchIcon, SlidersHorizontal, X } from "lucide-react"
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Check, ChevronDown, ChevronUp, Columns3, Download, ExternalLink, Plus, RefreshCw, Search as SearchIcon, SlidersHorizontal, X } from "lucide-react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
@@ -89,9 +98,10 @@ const ADVANCED_PARAM_CONFIG: AdvancedParamConfig[] = [
 
 const LAST_USED_INSTANCE_KEY = "qui:search:lastInstanceId"
 
-const SEARCH_TABLE_GRID_TEMPLATE =
-  "minmax(240px, 1fr) 140px 100px 100px 140px 110px 140px 110px 100px 150px 80px"
-const SEARCH_TABLE_MIN_WIDTH = 1410
+// Names this table's entries among the per-instance column settings of the torrent list.
+const SEARCH_TABLE_SETTINGS_KEY = "search"
+const SEARCH_DEFAULT_COLUMN_ORDER: string[] = [...SEARCH_TABLE_COLUMN_IDS]
+const SEARCH_DEFAULT_COLUMN_SIZING: SearchTableColumnWidths = {}
 const SEARCH_ROW_HEIGHT = 40
 const SEARCH_CARD_HEIGHT = 158
 
@@ -104,6 +114,8 @@ type SearchTableRowProps = {
   result: TorznabSearchResult
   isSelected: boolean
   isEven: boolean
+  columns: SearchTableColumnId[]
+  gridTemplate: string
   height: number
   translateY: number
   categoryLabel: string
@@ -117,6 +129,8 @@ const SearchTableRow = memo(function SearchTableRow({
   result,
   isSelected,
   isEven,
+  columns,
+  gridTemplate,
   height,
   translateY,
   categoryLabel,
@@ -126,6 +140,86 @@ const SearchTableRow = memo(function SearchTableRow({
   onViewDetails,
 }: SearchTableRowProps) {
   const { t } = useTranslation("search")
+  const textColor = isSelected && "text-accent-foreground"
+
+  const renderCell = (id: SearchTableColumnId) => {
+    switch (id) {
+      case "title":
+        return (
+          <div key={id} className={cn("px-2 flex items-center min-w-0 text-sm font-medium", textColor)}>
+            <div className="truncate" title={result.title}>
+              {result.title}
+            </div>
+          </div>
+        )
+      case "indexer":
+        return <div key={id} className={cn("px-2 flex items-center min-w-0 text-sm truncate", textColor)}>{result.indexer}</div>
+      case "size":
+        return <div key={id} className={cn("px-2 flex items-center text-sm", textColor)}>{formatBytes(result.size)}</div>
+      case "seeders":
+        return (
+          <div key={id} className={cn("px-2 flex items-center", textColor)}>
+            <Badge variant={result.seeders > 0 ? "default" : "secondary"}>
+              {result.seeders}
+            </Badge>
+          </div>
+        )
+      case "category":
+        return (
+          <div key={id} className={cn("px-2 flex items-center min-w-0 text-sm text-muted-foreground truncate", textColor)}>
+            {categoryLabel}
+          </div>
+        )
+      case "source":
+        return (
+          <div key={id} className={cn("px-2 flex items-center min-w-0 text-sm", textColor)}>
+            {result.source ? (
+              <Badge variant="outline">{result.source}</Badge>
+            ) : (
+              <span className="text-muted-foreground">-</span>
+            )}
+          </div>
+        )
+      case "collection":
+        return (
+          <div key={id} className={cn("px-2 flex items-center min-w-0 text-sm", textColor)}>
+            {result.collection ? (
+              <Badge variant="outline" className="truncate max-w-full">{result.collection}</Badge>
+            ) : (
+              <span className="text-muted-foreground">-</span>
+            )}
+          </div>
+        )
+      case "group":
+        return (
+          <div key={id} className={cn("px-2 flex items-center min-w-0 text-sm", textColor)}>
+            {result.group ? (
+              <Badge variant="outline" className="truncate max-w-full">{result.group}</Badge>
+            ) : (
+              <span className="text-muted-foreground">-</span>
+            )}
+          </div>
+        )
+      case "freeleech":
+        return (
+          <div key={id} className={cn("px-2 flex items-center", textColor)}>
+            {result.downloadVolumeFactor === 0 && (
+              <Badge variant="default">{t("results.free")}</Badge>
+            )}
+            {result.downloadVolumeFactor > 0 && result.downloadVolumeFactor < 1 && (
+              <Badge variant="secondary">{result.downloadVolumeFactor * 100}%</Badge>
+            )}
+          </div>
+        )
+      case "published":
+        return (
+          <div key={id} className={cn("px-2 flex items-center text-sm text-muted-foreground", textColor)}>
+            {publishedLabel}
+          </div>
+        )
+    }
+  }
+
   return (
     <div
       role="button"
@@ -136,7 +230,7 @@ const SearchTableRow = memo(function SearchTableRow({
         isSelected? "bg-accent text-accent-foreground hover:bg-accent/90": isEven? "hover:bg-muted/60 bg-card/90 dark:bg-card/80": "hover:bg-muted/60 bg-background/70 dark:bg-background/30"
       )}
       style={{
-        gridTemplateColumns: SEARCH_TABLE_GRID_TEMPLATE,
+        gridTemplateColumns: gridTemplate,
         position: "absolute",
         top: 0,
         left: 0,
@@ -157,53 +251,7 @@ const SearchTableRow = memo(function SearchTableRow({
         }
       }}
     >
-      <div className={cn("px-2 flex items-center min-w-0 text-sm font-medium", isSelected && "text-accent-foreground")}>
-        <div className="truncate" title={result.title}>
-          {result.title}
-        </div>
-      </div>
-      <div className={cn("px-2 flex items-center min-w-0 text-sm truncate", isSelected && "text-accent-foreground")}>{result.indexer}</div>
-      <div className={cn("px-2 flex items-center text-sm", isSelected && "text-accent-foreground")}>{formatBytes(result.size)}</div>
-      <div className={cn("px-2 flex items-center", isSelected && "text-accent-foreground")}>
-        <Badge variant={result.seeders > 0 ? "default" : "secondary"}>
-          {result.seeders}
-        </Badge>
-      </div>
-      <div className={cn("px-2 flex items-center min-w-0 text-sm text-muted-foreground truncate", isSelected && "text-accent-foreground")}>
-        {categoryLabel}
-      </div>
-      <div className={cn("px-2 flex items-center min-w-0 text-sm", isSelected && "text-accent-foreground")}>
-        {result.source ? (
-          <Badge variant="outline">{result.source}</Badge>
-        ) : (
-          <span className="text-muted-foreground">-</span>
-        )}
-      </div>
-      <div className={cn("px-2 flex items-center min-w-0 text-sm", isSelected && "text-accent-foreground")}>
-        {result.collection ? (
-          <Badge variant="outline" className="truncate max-w-full">{result.collection}</Badge>
-        ) : (
-          <span className="text-muted-foreground">-</span>
-        )}
-      </div>
-      <div className={cn("px-2 flex items-center min-w-0 text-sm", isSelected && "text-accent-foreground")}>
-        {result.group ? (
-          <Badge variant="outline" className="truncate max-w-full">{result.group}</Badge>
-        ) : (
-          <span className="text-muted-foreground">-</span>
-        )}
-      </div>
-      <div className={cn("px-2 flex items-center", isSelected && "text-accent-foreground")}>
-        {result.downloadVolumeFactor === 0 && (
-          <Badge variant="default">{t("results.free")}</Badge>
-        )}
-        {result.downloadVolumeFactor > 0 && result.downloadVolumeFactor < 1 && (
-          <Badge variant="secondary">{result.downloadVolumeFactor * 100}%</Badge>
-        )}
-      </div>
-      <div className={cn("px-2 flex items-center text-sm text-muted-foreground", isSelected && "text-accent-foreground")}>
-        {publishedLabel}
-      </div>
+      {columns.map(renderCell)}
       <div className="px-2 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -287,6 +335,16 @@ export function Search() {
   const blurTimeoutRef = useRef<number | null>(null)
   const rafIdRef = useRef<number | null>(null)
   const tableScrollRef = useRef<HTMLDivElement | null>(null)
+  const [columnWidths, setColumnWidths] = usePersistedColumnSizing(SEARCH_DEFAULT_COLUMN_SIZING, SEARCH_TABLE_SETTINGS_KEY)
+  const [columnVisibility, setColumnVisibility] = usePersistedColumnVisibility({}, SEARCH_TABLE_SETTINGS_KEY)
+  const { columnOrder, sensors, onDragEnd } = useColumnDnd({
+    instanceId: SEARCH_TABLE_SETTINGS_KEY,
+    defaultColumnOrder: SEARCH_DEFAULT_COLUMN_ORDER,
+    getLeafColumnIds: () => SEARCH_DEFAULT_COLUMN_ORDER,
+  })
+  const visibleColumns = useMemo(() => getVisibleSearchColumns(columnOrder, columnVisibility), [columnOrder, columnVisibility])
+  const gridTemplate = useMemo(() => buildSearchGridTemplate(visibleColumns, columnWidths), [visibleColumns, columnWidths])
+  const tableMinWidth = getSearchTableMinWidth(visibleColumns, columnWidths)
   const cardsScrollRef = useRef<HTMLDivElement | null>(null)
   const { formatDate } = useDateTimeFormatters()
   const closeSuggestions = useCallback(() => {
@@ -993,6 +1051,41 @@ export function Search() {
     return t("card.addToNamedOffline", { name: instance.name })
   }
 
+  const columnLabels: Record<SearchTableColumnId, string> = {
+    title: t("table.title"),
+    indexer: t("table.indexer"),
+    size: t("table.size"),
+    seeders: t("table.seeders"),
+    category: t("table.category"),
+    source: t("table.source"),
+    collection: t("table.collection"),
+    group: t("table.group"),
+    freeleech: t("table.freeleech"),
+    published: t("table.published"),
+  }
+
+  const columnFilterConfigs: Record<SearchTableColumnId, Pick<ComponentProps<typeof ColumnFilterPopover>, "columnType" | "options" | "multiSelect">> = {
+    title: { columnType: "string" },
+    indexer: { columnType: "enum", options: indexerOptions, multiSelect: true },
+    size: { columnType: "size" },
+    seeders: { columnType: "number" },
+    category: { columnType: "enum", options: categoryOptions, multiSelect: true },
+    source: { columnType: "enum", options: sourceOptions, multiSelect: true },
+    collection: { columnType: "string" },
+    group: { columnType: "string" },
+    freeleech: { columnType: "enum", options: freeleechOptions, multiSelect: true },
+    published: { columnType: "date" },
+  }
+
+  const columnMenuItems = columnOrder
+    .filter((id): id is SearchTableColumnId => id in columnLabels)
+    .map((id) => ({
+      id,
+      label: columnLabels[id],
+      visible: id === SEARCH_TABLE_TITLE_COLUMN || columnVisibility[id] !== false,
+      canHide: id !== SEARCH_TABLE_TITLE_COLUMN,
+    }))
+
   let refreshButtonTitle = t("results.refreshFromIndexers")
   if (refreshCooldownRemaining > 0) {
     refreshButtonTitle = t("results.refreshReadyIn", { seconds: Math.ceil(refreshCooldownRemaining / 1000) })
@@ -1524,6 +1617,30 @@ export function Search() {
                     >
                       <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
                     </Button>
+                    <DropdownMenu>
+                      <Tooltip disableHoverableContent={true}>
+                        <TooltipTrigger asChild onFocus={(e) => e.preventDefault()}>
+                          <DropdownMenuTrigger asChild>
+                            <Button type="button" variant="ghost" size="icon" className="hidden h-7 w-7 sm:inline-flex">
+                              <Columns3 className="h-4 w-4" />
+                              <span className="sr-only">{t("torrents:tableView.toggleColumns")}</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent>{t("torrents:tableView.toggleColumns")}</TooltipContent>
+                      </Tooltip>
+                      <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuLabel>{t("torrents:tableView.toggleColumns")}</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <ColumnOrderList
+                          items={columnMenuItems}
+                          sensors={sensors}
+                          onDragEnd={onDragEnd}
+                          onToggle={(id, visible) => setColumnVisibility(prev => ({ ...prev, [id]: visible }))}
+                          reorderLabel={(label) => t("torrents:tableView.reorderColumn", { column: label })}
+                        />
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
                 {/* Mobile: Card-based view */}
@@ -1568,258 +1685,51 @@ export function Search() {
 
                 {/* Desktop: Full table view */}
                 <div ref={tableScrollRef} className="hidden sm:block max-h-150 overflow-auto border rounded-md will-change-transform contain-paint">
-                  <div style={{ position: "relative", minWidth: `${SEARCH_TABLE_MIN_WIDTH}px` }}>
-                    <div
-                      className="sticky top-0 z-20 grid bg-card border-b"
-                      style={{ gridTemplateColumns: SEARCH_TABLE_GRID_TEMPLATE }}
+                  <div style={{ position: "relative", minWidth: `${tableMinWidth}px` }}>
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      modifiers={[restrictToHorizontalAxis]}
+                      onDragEnd={onDragEnd}
                     >
-                      <div className="h-10 px-2 flex items-center text-sm font-medium text-muted-foreground">
-                        <div className="group flex w-full items-center justify-between gap-2 cursor-pointer select-none" onClick={() => handleSort("title")}>
-                          <span className="select-none">{t("table.title")}</span>
-                          <div className="flex items-center gap-1">
-                            {getSortIcon("title")}
-                            <div onClick={(e) => e.stopPropagation()}>
-                              <ColumnFilterPopover
-                                columnId="title"
-                                columnName={t("table.title")}
-                                columnType="string"
-                                currentFilter={columnFilters.title}
-                                onApply={(filter) => {
-                                  setColumnFilters(prev => {
-                                    const next = { ...prev }
-                                    if (filter) next.title = filter
-                                    else delete next.title
-                                    return next
-                                  })
-                                }}
-                              />
-                            </div>
+                      <SortableContext items={visibleColumns} strategy={horizontalListSortingStrategy}>
+                        <div
+                          className="sticky top-0 z-20 grid bg-card border-b"
+                          style={{ gridTemplateColumns: gridTemplate }}
+                        >
+                          {visibleColumns.map((id) => (
+                            <SearchTableHeaderCell
+                              key={id}
+                              id={id}
+                              label={columnLabels[id]}
+                              sortIcon={id !== "freeleech" ? getSortIcon(id) : null}
+                              onSort={id !== "freeleech" ? () => handleSort(id) : undefined}
+                              filter={
+                                <ColumnFilterPopover
+                                  columnId={id}
+                                  columnName={columnLabels[id]}
+                                  currentFilter={columnFilters[id]}
+                                  onApply={(filter) => {
+                                    setColumnFilters(prev => {
+                                      const next = { ...prev }
+                                      if (filter) next[id] = filter
+                                      else delete next[id]
+                                      return next
+                                    })
+                                  }}
+                                  {...columnFilterConfigs[id]}
+                                />
+                              }
+                              onResize={(width) => setColumnWidths(prev => ({ ...prev, [id]: width }))}
+                              onResetWidth={() => setColumnWidths(({ [id]: _removed, ...rest }) => rest)}
+                            />
+                          ))}
+                          <div className="h-10 px-2 flex items-center text-sm font-medium text-muted-foreground">
+                            <span className="sr-only">{t("table.actions")}</span>
                           </div>
                         </div>
-                      </div>
-                      <div className="h-10 px-2 flex items-center text-sm font-medium text-muted-foreground">
-                        <div className="group flex w-full items-center justify-between gap-2 cursor-pointer select-none" onClick={() => handleSort("indexer")}>
-                          <span className="select-none">{t("table.indexer")}</span>
-                          <div className="flex items-center gap-1">
-                            {getSortIcon("indexer")}
-                            <div onClick={(e) => e.stopPropagation()}>
-                              <ColumnFilterPopover
-                                columnId="indexer"
-                                columnName={t("table.indexer")}
-                                columnType="enum"
-                                options={indexerOptions}
-                                currentFilter={columnFilters.indexer}
-                                multiSelect={true}
-                                onApply={(filter) => {
-                                  setColumnFilters(prev => {
-                                    const next = { ...prev }
-                                    if (filter) next.indexer = filter
-                                    else delete next.indexer
-                                    return next
-                                  })
-                                }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="h-10 px-2 flex items-center text-sm font-medium text-muted-foreground">
-                        <div className="group flex w-full items-center justify-between gap-2 cursor-pointer select-none" onClick={() => handleSort("size")}>
-                          <span className="select-none">{t("table.size")}</span>
-                          <div className="flex items-center gap-1">
-                            {getSortIcon("size")}
-                            <div onClick={(e) => e.stopPropagation()}>
-                              <ColumnFilterPopover
-                                columnId="size"
-                                columnName={t("table.size")}
-                                columnType="size"
-                                currentFilter={columnFilters.size}
-                                onApply={(filter) => {
-                                  setColumnFilters(prev => {
-                                    const next = { ...prev }
-                                    if (filter) next.size = filter
-                                    else delete next.size
-                                    return next
-                                  })
-                                }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="h-10 px-2 flex items-center text-sm font-medium text-muted-foreground">
-                        <div className="group flex w-full items-center justify-between gap-2 cursor-pointer select-none" onClick={() => handleSort("seeders")}>
-                          <span className="select-none">{t("table.seeders")}</span>
-                          <div className="flex items-center gap-1">
-                            {getSortIcon("seeders")}
-                            <div onClick={(e) => e.stopPropagation()}>
-                              <ColumnFilterPopover
-                                columnId="seeders"
-                                columnName={t("table.seeders")}
-                                columnType="number"
-                                currentFilter={columnFilters.seeders}
-                                onApply={(filter) => {
-                                  setColumnFilters(prev => {
-                                    const next = { ...prev }
-                                    if (filter) next.seeders = filter
-                                    else delete next.seeders
-                                    return next
-                                  })
-                                }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="h-10 px-2 flex items-center text-sm font-medium text-muted-foreground">
-                        <div className="group flex w-full items-center justify-between gap-2 cursor-pointer select-none" onClick={() => handleSort("category")}>
-                          <span className="select-none">{t("table.category")}</span>
-                          <div className="flex items-center gap-1">
-                            {getSortIcon("category")}
-                            <div onClick={(e) => e.stopPropagation()}>
-                              <ColumnFilterPopover
-                                columnId="category"
-                                columnName={t("table.category")}
-                                columnType="enum"
-                                options={categoryOptions}
-                                currentFilter={columnFilters.category}
-                                multiSelect={true}
-                                onApply={(filter) => {
-                                  setColumnFilters(prev => {
-                                    const next = { ...prev }
-                                    if (filter) next.category = filter
-                                    else delete next.category
-                                    return next
-                                  })
-                                }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="h-10 px-2 flex items-center text-sm font-medium text-muted-foreground">
-                        <div className="group flex w-full items-center justify-between gap-2 cursor-pointer select-none" onClick={() => handleSort("source")}>
-                          <span className="select-none">{t("table.source")}</span>
-                          <div className="flex items-center gap-1">
-                            {getSortIcon("source")}
-                            <div onClick={(e) => e.stopPropagation()}>
-                              <ColumnFilterPopover
-                                columnId="source"
-                                columnName={t("table.source")}
-                                columnType="enum"
-                                options={sourceOptions}
-                                currentFilter={columnFilters.source}
-                                multiSelect={true}
-                                onApply={(filter) => {
-                                  setColumnFilters(prev => {
-                                    const next = { ...prev }
-                                    if (filter) next.source = filter
-                                    else delete next.source
-                                    return next
-                                  })
-                                }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="h-10 px-2 flex items-center text-sm font-medium text-muted-foreground">
-                        <div className="group flex w-full items-center justify-between gap-2 cursor-pointer select-none" onClick={() => handleSort("collection")}>
-                          <span className="select-none">{t("table.collection")}</span>
-                          <div className="flex items-center gap-1">
-                            {getSortIcon("collection")}
-                            <div onClick={(e) => e.stopPropagation()}>
-                              <ColumnFilterPopover
-                                columnId="collection"
-                                columnName={t("table.collection")}
-                                columnType="string"
-                                currentFilter={columnFilters.collection}
-                                onApply={(filter) => {
-                                  setColumnFilters(prev => {
-                                    const next = { ...prev }
-                                    if (filter) next.collection = filter
-                                    else delete next.collection
-                                    return next
-                                  })
-                                }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="h-10 px-2 flex items-center text-sm font-medium text-muted-foreground">
-                        <div className="group flex w-full items-center justify-between gap-2 cursor-pointer select-none" onClick={() => handleSort("group")}>
-                          <span className="select-none">{t("table.group")}</span>
-                          <div className="flex items-center gap-1">
-                            {getSortIcon("group")}
-                            <div onClick={(e) => e.stopPropagation()}>
-                              <ColumnFilterPopover
-                                columnId="group"
-                                columnName={t("table.group")}
-                                columnType="string"
-                                currentFilter={columnFilters.group}
-                                onApply={(filter) => {
-                                  setColumnFilters(prev => {
-                                    const next = { ...prev }
-                                    if (filter) next.group = filter
-                                    else delete next.group
-                                    return next
-                                  })
-                                }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="h-10 px-2 flex items-center text-sm font-medium text-muted-foreground">
-                        <div className="group flex w-full items-center justify-between gap-2 select-none">
-                          <span>{t("table.freeleech")}</span>
-                          <ColumnFilterPopover
-                            columnId="freeleech"
-                            columnName={t("table.freeleech")}
-                            columnType="enum"
-                            options={freeleechOptions}
-                            currentFilter={columnFilters.freeleech}
-                            multiSelect={true}
-                            onApply={(filter) => {
-                              setColumnFilters(prev => {
-                                const next = { ...prev }
-                                if (filter) next.freeleech = filter
-                                else delete next.freeleech
-                                return next
-                              })
-                            }}
-                          />
-                        </div>
-                      </div>
-                      <div className="h-10 px-2 flex items-center text-sm font-medium text-muted-foreground">
-                        <div className="group flex w-full items-center justify-between gap-2 cursor-pointer select-none" onClick={() => handleSort("published")}>
-                          <span className="select-none">{t("table.published")}</span>
-                          <div className="flex items-center gap-1">
-                            {getSortIcon("published")}
-                            <div onClick={(e) => e.stopPropagation()}>
-                              <ColumnFilterPopover
-                                columnId="published"
-                                columnName={t("table.published")}
-                                columnType="date"
-                                currentFilter={columnFilters.published}
-                                onApply={(filter) => {
-                                  setColumnFilters(prev => {
-                                    const next = { ...prev }
-                                    if (filter) next.published = filter
-                                    else delete next.published
-                                    return next
-                                  })
-                                }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="h-10 px-2 flex items-center text-sm font-medium text-muted-foreground">
-                        <span className="sr-only">{t("table.actions")}</span>
-                      </div>
-                    </div>
+                      </SortableContext>
+                    </DndContext>
 
                     <div style={{ height: `${tableVirtualizer.getTotalSize()}px`, width: "100%", position: "relative" }}>
                       {tableVirtualizer.getVirtualItems().map((virtualRow) => {
@@ -1830,6 +1740,8 @@ export function Search() {
                             result={result}
                             isSelected={selectedResultKey === getSearchResultKey(result)}
                             isEven={virtualRow.index % 2 === 0}
+                            columns={visibleColumns}
+                            gridTemplate={gridTemplate}
                             height={virtualRow.size}
                             translateY={virtualRow.start}
                             categoryLabel={categoryMap.get(result.categoryId) || result.categoryName || t("results.categoryFallback", { id: result.categoryId })}
