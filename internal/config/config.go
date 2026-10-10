@@ -168,6 +168,7 @@ func (c *AppConfig) defaults() {
 	c.viper.SetDefault("oidcClientSecret", "")
 	c.viper.SetDefault("oidcRedirectUrl", "")
 	c.viper.SetDefault("oidcDisableBuiltInLogin", false)
+	c.viper.SetDefault("oidcAutoLogin", false)
 }
 
 func (c *AppConfig) load(configDirOrPath string) error {
@@ -278,6 +279,7 @@ func (c *AppConfig) loadFromEnv() {
 	c.viper.BindEnv("oidcDisableBuiltInLogin", envPrefix+"OIDC_DISABLE_BUILT_IN_LOGIN")
 	c.viper.BindEnv("oidcAllowedSubject", envPrefix+"OIDC_ALLOWED_SUBJECT")
 	c.viper.BindEnv("oidcAllowedEmail", envPrefix+"OIDC_ALLOWED_EMAIL")
+	c.viper.BindEnv("oidcAutoLogin", envPrefix+"OIDC_AUTO_LOGIN")
 }
 
 func (c *AppConfig) watchConfig() {
@@ -445,6 +447,7 @@ func (c *AppConfig) hydrateConfigFromViper() {
 	c.Config.OIDCDisableBuiltInLogin = c.viper.GetBool("oidcDisableBuiltInLogin")
 	c.Config.OIDCAllowedSubject = c.viper.GetString("oidcAllowedSubject")
 	c.Config.OIDCAllowedEmail = c.viper.GetString("oidcAllowedEmail")
+	c.Config.OIDCAutoLogin = c.viper.GetBool("oidcAutoLogin")
 }
 
 func (c *AppConfig) loadAllowedHosts() error {
@@ -780,6 +783,9 @@ sessionSecret = "{{ .sessionSecret }}"
 
 # Environment variable: QUI__OIDC_ALLOWED_EMAIL
 #oidcAllowedEmail = ""
+
+# Send the browser to the OIDC provider from the login page without a click (only works when OIDC is enabled)
+#oidcAutoLogin = false
 `
 
 	// Prepare template data

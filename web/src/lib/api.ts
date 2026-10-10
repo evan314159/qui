@@ -735,6 +735,7 @@ class ApiClient {
     enabled: boolean
     authorizationUrl: string
     disableBuiltInLogin: boolean
+    autoLogin: boolean
     issuerUrl: string
     providerUnavailable: boolean
   }> {
@@ -743,6 +744,7 @@ class ApiClient {
         enabled: boolean
         authorizationUrl: string
         disableBuiltInLogin: boolean
+        autoLogin: boolean
         issuerUrl: string
       }>("/auth/oidc/config")
       return { ...config, providerUnavailable: false }
@@ -754,6 +756,7 @@ class ApiClient {
           enabled: true,
           authorizationUrl: "",
           disableBuiltInLogin: data?.disableBuiltInLogin === true,
+          autoLogin: false,
           issuerUrl: "",
           providerUnavailable: true,
         }
@@ -764,6 +767,7 @@ class ApiClient {
           enabled: false,
           authorizationUrl: "",
           disableBuiltInLogin: false,
+          autoLogin: false,
           issuerUrl: "",
           providerUnavailable: false,
         }
