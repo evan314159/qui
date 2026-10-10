@@ -216,3 +216,81 @@ func TestOIDCConfigReturnsInternalServerErrorWhenPKCEVerifierGenerationFails(t *
 	assert.Empty(t, handler.sessionManager.GetString(req.Context(), "oidc_state"))
 	assert.Empty(t, handler.sessionManager.GetString(req.Context(), "oidc_pkce_verifier"))
 }
+
+func TestOIDCCallbackFailuresRedirectToLogin(t *testing.T) {
+	discovery := newOIDCDiscoveryServer(t, nil)
+
+	tests := []struct {
+		name         string
+		sessionState string
+		query        string
+	}{
+		{name: "no state in session", query: "?code=abc&state=anything"},
+		{name: "state mismatch", sessionState: "expected", query: "?code=abc&state=other"},
+		{name: "provider error", sessionState: "expected", query: "?error=access_denied&state=expected"},
+		{name: "token exchange fails", sessionState: "expected", query: "?code=abc&state=expected"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := newTestOIDCHandler(t, discovery.URL)
+
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/auth/oidc/callback"+tt.query, nil)
+			ctx, err := handler.sessionManager.Load(req.Context(), "")
+			require.NoError(t, err)
+			req = req.WithContext(ctx)
+			if tt.sessionState != "" {
+				handler.sessionManager.Put(req.Context(), "oidc_state", tt.sessionState)
+			}
+
+			rec := httptest.NewRecorder()
+			handler.handleCallback(rec, req)
+
+			require.Equal(t, http.StatusFound, rec.Code)
+			assert.Equal(t, "/login?oidc_error=1", rec.Header().Get("Location"))
+			assert.False(t, handler.sessionManager.GetBool(req.Context(), "authenticated"))
+		})
+	}
+}
+
+func TestOIDCCallbackFailureRedirectKeepsConfiguredBaseURL(t *testing.T) {
+	discovery := newOIDCDiscoveryServer(t, nil)
+	handler := newTestOIDCHandler(t, discovery.URL)
+	handler.config.OIDCRedirectURL = "https://qui.example.com/qui/api/auth/oidc/callback"
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/auth/oidc/callback?error=access_denied", nil)
+	ctx, err := handler.sessionManager.Load(req.Context(), "")
+	require.NoError(t, err)
+
+	rec := httptest.NewRecorder()
+	handler.handleCallback(rec, req.WithContext(ctx))
+
+	require.Equal(t, http.StatusFound, rec.Code)
+	assert.Equal(t, "https://qui.example.com/qui/login?oidc_error=1", rec.Header().Get("Location"))
+}
+
+func TestOIDCConfigResponseReportsAutoLoginSeparatelyFromBuiltInLogin(t *testing.T) {
+	discovery := newOIDCDiscoveryServer(t, nil)
+	handler := newTestOIDCHandler(t, discovery.URL)
+
+	for _, tt := range []struct {
+		name                      string
+		disableBuiltIn, autoLogin bool
+	}{
+		{name: "both off"},
+		{name: "built-in login hidden only", disableBuiltIn: true},
+		{name: "auto login only", autoLogin: true},
+		{name: "both on", disableBuiltIn: true, autoLogin: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			handler.config.OIDCDisableBuiltInLogin = tt.disableBuiltIn
+			handler.config.OIDCAutoLogin = tt.autoLogin
+
+			response, _, _, err := handler.GetConfigResponse()
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.disableBuiltIn, response.DisableBuiltInLogin)
+			assert.Equal(t, tt.autoLogin, response.AutoLogin)
+		})
+	}
+}

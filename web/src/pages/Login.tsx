@@ -16,11 +16,12 @@ import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/hooks/useAuth"
 import { navigateAfterAuth } from "@/lib/add-intent"
 import { api } from "@/lib/api"
+import { consumeOIDCAutoLoginSkip, isOIDCAutoLoginBlocked, OIDC_ERROR_PARAM, recordOIDCAutoLoginAttempt } from "@/lib/oidc-autologin"
 import { useQuery } from "@tanstack/react-query"
 import { useForm } from "@tanstack/react-form"
 import { useNavigate } from "@tanstack/react-router"
 import { Fingerprint } from "lucide-react"
-import { useEffect } from "react"
+import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { useTranslation } from "react-i18next"
 
@@ -30,7 +31,7 @@ export function Login() {
   const { login, isLoggingIn, loginError, setIsAuthenticated, isAuthenticated, isLoading } = useAuth()
 
   // Query to check if setup is required
-  const { data: setupRequired } = useQuery({
+  const { data: setupRequired, isError: setupCheckFailed } = useQuery({
     queryKey: ["setup-required"],
     queryFn: () => api.checkSetupRequired(),
     staleTime: Infinity,
@@ -46,6 +47,37 @@ export function Login() {
     retry: false,
     refetchOnWindowFocus: false,
   })
+
+  // Decided once per visit, before the effect below clears what it reads.
+  const [autoLoginBlocked] = useState(() => isOIDCAutoLoginBlocked(window.location.search))
+  const autoLoginHandled = useRef(false)
+  const autoLoginUrl = oidcConfig?.enabled && oidcConfig.autoLogin ? oidcConfig.authorizationUrl : ""
+  // A failed setup check leaves the sign-in page up instead of waiting on it forever.
+  const autoLoginPending = !!autoLoginUrl && !autoLoginBlocked && !isAuthenticated && !setupCheckFailed
+
+  useEffect(() => {
+    if (autoLoginHandled.current) return
+
+    const params = new URLSearchParams(window.location.search)
+    if (params.has(OIDC_ERROR_PARAM)) {
+      autoLoginHandled.current = true
+      params.delete(OIDC_ERROR_PARAM)
+      const search = params.toString()
+      window.history.replaceState(null, "", `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`)
+      toast.error(t("login.oidcFailed"))
+      return
+    }
+
+    // Wait for the setup and auth checks, so a first run or a live session is not redirected away.
+    if (!autoLoginUrl || setupRequired !== false || isLoading || isAuthenticated) return
+
+    autoLoginHandled.current = true
+    consumeOIDCAutoLoginSkip()
+    if (autoLoginBlocked) return
+
+    recordOIDCAutoLoginAttempt()
+    window.location.href = autoLoginUrl
+  }, [autoLoginUrl, autoLoginBlocked, setupRequired, isLoading, isAuthenticated, t])
 
   useEffect(() => {
     if (sessionStorage.getItem("qui_sso_recovered")) {
@@ -101,8 +133,8 @@ export function Login() {
     }
   }
 
-  // Show loading state while checking OIDC config
-  if (oidcConfig === null) {
+  // Show loading state while checking OIDC config, and while redirecting to the provider
+  if (oidcConfig === null || autoLoginPending) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="text-center">{t("login.loading")}</div>
