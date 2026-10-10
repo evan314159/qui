@@ -51,6 +51,14 @@ Click **Advanced** to send extra Torznab parameters. A search with advanced para
 
 Results appear in a table with the columns Title, Indexer, Size, Seeders, Category, Source, Collection, Group, Freeleech, and Published. By default, the table sorts by seeders. Click a column header to change the sort.
 
+To change the layout on a wider screen:
+
+- Drag a header to reorder the columns.
+- Drag the right edge of a header to resize a column. Double-click the edge to reset its width.
+- Click the columns button next to the refresh button to show or hide columns and to reorder them. The Title column is always shown.
+
+qui keeps these choices in your client settings.
+
 The filter box narrows the visible results by title, indexer, category, source, collection, or group. Column filters provide per-column matching and include a freeleech filter for free and partial-discount results.
 
 ## Send a result to an instance

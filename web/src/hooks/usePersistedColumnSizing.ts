@@ -27,11 +27,13 @@ export function usePersistedColumnSizing(
 ) {
   const hasInstanceKey = instanceKey !== undefined && instanceKey !== null
   const storageKey = hasInstanceKey ? `${BASE_STORAGE_KEY}:${instanceKey}` : BASE_STORAGE_KEY
+  // A named table such as "search" never had the shared key, so only an instance id migrates it.
+  const isInstanceId = typeof instanceKey === "number"
 
   // Migrate the pre-instance-scoping shared key into the instance key once,
   // then drop it.
   useEffect(() => {
-    if (!hasInstanceKey) return
+    if (!isInstanceId) return
     try {
       const legacy = localStorage.getItem(BASE_STORAGE_KEY)
       if (legacy && readRaw(storageKey) == null) {
@@ -41,7 +43,7 @@ export function usePersistedColumnSizing(
     } catch (error) {
       console.error("Failed to migrate legacy column sizing state:", error)
     }
-  }, [hasInstanceKey, storageKey])
+  }, [isInstanceId, storageKey])
 
   const defaultsJson = JSON.stringify(defaultSizing)
   const defaultValue = useMemo<ColumnSizingState>(() => JSON.parse(defaultsJson), [defaultsJson])
