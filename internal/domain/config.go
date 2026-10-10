@@ -89,6 +89,7 @@ type Config struct {
 	OIDCDisableBuiltInLogin bool   `toml:"oidcDisableBuiltInLogin" mapstructure:"oidcDisableBuiltInLogin"`
 	OIDCAllowedSubject      string `toml:"oidcAllowedSubject" mapstructure:"oidcAllowedSubject"`
 	OIDCAllowedEmail        string `toml:"oidcAllowedEmail" mapstructure:"oidcAllowedEmail"`
+	OIDCAutoLogin           bool   `toml:"oidcAutoLogin" mapstructure:"oidcAutoLogin"`
 }
 
 // IsOIDCUserAllowed reports whether the OIDC user with the given subject and
