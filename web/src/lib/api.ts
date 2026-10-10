@@ -658,6 +658,7 @@ class ApiClient {
     enabled: boolean
     authorizationUrl: string
     disableBuiltInLogin: boolean
+    autoLogin: boolean
     issuerUrl: string
   }> {
     try {
@@ -668,6 +669,7 @@ class ApiClient {
         enabled: false,
         authorizationUrl: "",
         disableBuiltInLogin: false,
+        autoLogin: false,
         issuerUrl: "",
       }
     }

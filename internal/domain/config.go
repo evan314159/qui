@@ -82,6 +82,7 @@ type Config struct {
 	OIDCClientSecret        string `toml:"oidcClientSecret" mapstructure:"oidcClientSecret"`
 	OIDCRedirectURL         string `toml:"oidcRedirectUrl" mapstructure:"oidcRedirectUrl"`
 	OIDCDisableBuiltInLogin bool   `toml:"oidcDisableBuiltInLogin" mapstructure:"oidcDisableBuiltInLogin"`
+	OIDCAutoLogin           bool   `toml:"oidcAutoLogin" mapstructure:"oidcAutoLogin"`
 }
 
 // SecureSessionCookie reports whether the session cookie needs the Secure
