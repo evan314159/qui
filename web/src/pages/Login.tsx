@@ -14,14 +14,16 @@ import { Label } from "@/components/ui/label"
 import { Logo } from "@/components/ui/Logo"
 import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/hooks/useAuth"
+import { useOIDCAutoLogin } from "@/hooks/useOIDCAutoLogin"
 import { navigateAfterAuth } from "@/lib/add-intent"
 import { api } from "@/lib/api"
+import { isOIDCAutoLoginBlocked } from "@/lib/oidc-autologin"
 import { themeArea } from "@/lib/theme-areas"
 import { useQuery } from "@tanstack/react-query"
 import { useForm } from "@tanstack/react-form"
 import { useNavigate } from "@tanstack/react-router"
 import { Fingerprint } from "lucide-react"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { useTranslation } from "react-i18next"
 
@@ -30,7 +32,7 @@ export function Login() {
   const navigate = useNavigate()
   const { login, isLoggingIn, loginError, setIsAuthenticated, isAuthenticated, isLoading } = useAuth()
 
-  const { data: setupRequired } = useQuery({
+  const { data: setupRequired, isError: setupCheckFailed } = useQuery({
     queryKey: ["setup-required"],
     queryFn: () => api.checkSetupRequired(),
     staleTime: Infinity,
@@ -49,6 +51,17 @@ export function Login() {
     staleTime: Infinity,
     retry: false,
     refetchOnWindowFocus: false,
+  })
+
+  const [autoLoginBlocked] = useState(() => isOIDCAutoLoginBlocked(window.location.search))
+  const autoLoginUrl = oidcConfig?.enabled && oidcConfig.autoLogin ? oidcConfig.authorizationUrl : ""
+  const autoLoginPending = !!autoLoginUrl && !autoLoginBlocked && !isAuthenticated && !setupCheckFailed
+
+  useOIDCAutoLogin({
+    autoLoginUrl,
+    autoLoginBlocked,
+    ready: setupRequired === false && !isLoading && !isAuthenticated,
+    failedMessage: t("login.oidcFailed"),
   })
 
   useEffect(() => {
@@ -106,7 +119,7 @@ export function Login() {
     }
   }
 
-  if (oidcConfig === null) {
+  if (oidcConfig === null || autoLoginPending) {
     return (
       <div {...themeArea("login")} className="flex h-screen items-center justify-center bg-background">
         <div className="text-center">{t("login.loading")}</div>

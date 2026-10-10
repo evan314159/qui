@@ -42,6 +42,15 @@ For the full mapping (TOML keys + environment variables + defaults), see [Config
 | `QUI__OIDC_DISABLE_BUILT_IN_LOGIN` | When OIDC is enabled, set to `true` to hide the local username/password form |
 | `QUI__OIDC_ALLOWED_SUBJECT` | Only the account with this subject identifier (`sub`) can log in |
 | `QUI__OIDC_ALLOWED_EMAIL` | Only an account with this verified email can log in |
+| `QUI__OIDC_AUTO_LOGIN` | When OIDC is enabled, set to `true` to send the browser to the provider from the login page without a click. See [Automatic sign-in](#automatic-sign-in) |
+
+## Automatic sign-in
+
+Set `QUI__OIDC_AUTO_LOGIN=true` and the login page sends the browser to the provider without a click. It is off by default, and it works with or without `QUI__OIDC_DISABLE_BUILT_IN_LOGIN`. The login page stays on screen, with the **OpenID Connect** button and the built-in form if you have not hidden it, in these cases:
+
+- The provider or qui rejected the sign-in. qui redirects to the login page and shows an error.
+- You just logged out of qui. The next visit signs in again.
+- A sign-in finished less than 30 seconds ago but you are still on the login page. This stops a redirect loop, for example when the browser drops the session cookie.
 
 ## Redirect URL format
 
@@ -66,6 +75,7 @@ QUI__OIDC_CLIENT_ID=qui \
 QUI__OIDC_CLIENT_SECRET=super-secret-value \
 QUI__OIDC_REDIRECT_URL=https://qui.example.com/api/auth/oidc/callback \
 QUI__OIDC_DISABLE_BUILT_IN_LOGIN=true \
+QUI__OIDC_AUTO_LOGIN=true \
 qui serve
 ```
 

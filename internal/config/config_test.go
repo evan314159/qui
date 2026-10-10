@@ -1151,3 +1151,36 @@ func TestReloadKeepsExperimentalFeatures(t *testing.T) {
 	assert.Equal(t, []string{"testAlpha"}, cfg.Config.ExperimentalFeatures)
 	assert.Equal(t, []string{"testAlpha"}, cfg.Config.Live().ExperimentalFeatures)
 }
+
+func TestOIDCAutoLoginOption(t *testing.T) {
+	load := func(t *testing.T) *AppConfig {
+		t.Helper()
+		cfg := &AppConfig{Config: &domain.Config{}, viper: viper.New()}
+		cfg.defaults()
+		cfg.loadFromEnv()
+		cfg.hydrateConfigFromViper()
+		return cfg
+	}
+
+	t.Run("is off by default", func(t *testing.T) {
+		assert.False(t, load(t).Config.OIDCAutoLogin)
+	})
+
+	t.Run("is turned on by the environment variable", func(t *testing.T) {
+		t.Setenv(envPrefix+"OIDC_AUTO_LOGIN", "true")
+
+		cfg := load(t)
+
+		assert.True(t, cfg.Config.OIDCAutoLogin)
+		assert.False(t, cfg.Config.OIDCDisableBuiltInLogin, "it is separate from hiding the built-in login")
+	})
+
+	t.Run("is separate from the built-in login setting", func(t *testing.T) {
+		t.Setenv(envPrefix+"OIDC_DISABLE_BUILT_IN_LOGIN", "true")
+
+		cfg := load(t)
+
+		assert.True(t, cfg.Config.OIDCDisableBuiltInLogin)
+		assert.False(t, cfg.Config.OIDCAutoLogin)
+	})
+}
