@@ -2801,6 +2801,7 @@ export function TorrentCardsMobile({
                   <ul className="space-y-1 ml-2">
                     <li>• <strong>{t("common:header.smartSearchGlob")}</strong> {t("mobileCards.searchModal.globExamples")}</li>
                     <li>• <strong>{t("common:header.smartSearchFuzzy")}</strong> {t("common:header.smartSearchFuzzyExample")}</li>
+                    <li>• <strong>{t("common:header.smartSearchExclude")}</strong> {t("common:header.smartSearchExcludeExample")}</li>
                     <li>• {t("common:header.smartSearchFields")}</li>
                     <li>• {t("mobileCards.searchModal.autoSearches")}</li>
                   </ul>

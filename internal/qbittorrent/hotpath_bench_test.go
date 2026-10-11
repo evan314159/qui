@@ -124,6 +124,7 @@ func BenchmarkHotSearch(b *testing.B) {
 		{"hit", "s01e01"},
 		{"miss", "zzzzz nothing here"},
 		{"multiword", "some release 2160p"},
+		{"exclude", "s01e01 -zzzzz"},
 	} {
 		b.Run(tc.name, func(b *testing.B) {
 			for b.Loop() {
