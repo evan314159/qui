@@ -53,6 +53,8 @@
     "smartSearchGlobExamples": "*.mkv, *1080p*, *S[0-9][0-9]E[0-9][0-9]*",
     "smartSearchFuzzy": "模糊匹配：",
     "smartSearchFuzzyExample": "\"breaking bad\" 可匹配 \"Breaking.Bad\"",
+    "smartSearchExclude": "排除词语：",
+    "smartSearchExcludeExample": "\"1080p -cam\" 会隐藏包含 \"cam\" 的名称",
     "smartSearchDots": "自动处理点号、下划线和方括号",
     "smartSearchFields": "搜索名称、分类和标签",
     "smartSearchEnter": "按回车键立即搜索",

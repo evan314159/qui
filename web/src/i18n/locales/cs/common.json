@@ -53,6 +53,8 @@
     "smartSearchGlobExamples": "*.mkv, *1080p*, *S[0-9][0-9]E[0-9][0-9]*",
     "smartSearchFuzzy": "Hrubé hledání:",
     "smartSearchFuzzyExample": "\"breaking bad\" najde \"Breaking.Bad\"",
+    "smartSearchExclude": "Vyloučení slov:",
+    "smartSearchExcludeExample": "\"1080p -cam\" skryje názvy obsahující \"cam\"",
     "smartSearchDots": "Zpracovává tečky, podtržítka a závorky",
     "smartSearchFields": "Hledá název, kategorii a tagy",
     "smartSearchEnter": "Stiskněte Enter pro okamžité hledání",
