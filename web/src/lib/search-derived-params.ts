@@ -42,6 +42,15 @@ const SEARCH_TYPE_KEYS: Record<SearchType, string> = {
   xxx: "searchTypes.xxx.label",
 }
 
+export const DEFAULT_SEARCH_TYPE: SearchType = "movies"
+
+/** Reads a stored search type, throwing for anything that is not one, so a stale value falls back to the default. */
+export function parseSearchType(raw: string): SearchType {
+  const value: unknown = JSON.parse(raw)
+  if (typeof value === "string" && Object.hasOwn(SEARCH_TYPE_KEYS, value)) return value as SearchType
+  throw new Error("invalid search type")
+}
+
 export function getSearchTypeOptions(t: TFunction): SearchTypeOption[] {
   return (Object.keys(SEARCH_TYPE_KEYS) as SearchType[]).map((value) => ({
     value,

@@ -23,7 +23,7 @@ Each indexer row has actions to test the connection and to sync its capabilities
 
 ## Run a search
 
-1. Open **Search** and pick a search type: **Movies** (the default), **TV**, **Music**, **Books & comics**, **Apps & games**, or **Adult**. The search type sets the Torznab categories that qui sends to the indexers.
+1. Open **Search** and pick a search type: **Movies** (the default), **TV**, **Music**, **Books & comics**, **Apps & games**, or **Adult**. The search type sets the Torznab categories that qui sends to the indexers. qui remembers the type you used last and starts on it next time.
 2. Enter a query. qui recognizes IMDb IDs (`tt1234567`) and TVDb IDs (`tvdb 123456`) inside the query and sends them as ID parameters.
 3. Click **Search**.
 
