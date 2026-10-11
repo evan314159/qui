@@ -53,6 +53,8 @@
     "smartSearchGlobExamples": "*.mkv, *1080p*, *S[0-9][0-9]E[0-9][0-9]*",
     "smartSearchFuzzy": "Coincidència aproximada:",
     "smartSearchFuzzyExample": "\"breaking bad\" troba \"Breaking.Bad\"",
+    "smartSearchExclude": "Exclou paraules:",
+    "smartSearchExcludeExample": "\"1080p -cam\" amaga els noms que contenen \"cam\"",
     "smartSearchDots": "Gestiona punts, guions baixos i claudàtors",
     "smartSearchFields": "Cerca al nom, la categoria i les etiquetes",
     "smartSearchEnter": "Prem Retorn per cercar a l'instant",
