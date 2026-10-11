@@ -26,6 +26,7 @@ import { useDateTimeFormatters } from "@/hooks/useDateTimeFormatters"
 import { useInstances } from "@/hooks/useInstances"
 import { usePersistedColumnSizing } from "@/hooks/usePersistedColumnSizing"
 import { usePersistedColumnVisibility } from "@/hooks/usePersistedColumnVisibility"
+import { usePersistedSearchType } from "@/hooks/usePersistedSearchType"
 import { api } from "@/lib/api"
 import type { ColumnFilter } from "@/lib/column-filter-utils"
 import { filterSearchResult } from "@/lib/column-filter-utils"
@@ -302,7 +303,7 @@ export function Search() {
   const [indexers, setIndexers] = useState<TorznabIndexer[]>([])
   const [selectedIndexers, setSelectedIndexers] = useState<Set<number>>(new Set())
   const [indexerSheetOpen, setIndexerSheetOpen] = useState(false)
-  const [searchType, setSearchType] = useState<SearchType>("movies")
+  const [searchType, setSearchType] = usePersistedSearchType()
   const [loadingIndexers, setLoadingIndexers] = useState(true)
   const { instances, isLoading: loadingInstances } = useInstances()
   const [selectedInstanceId, setSelectedInstanceId] = useState<number | null>(null)
@@ -964,7 +965,7 @@ export function Search() {
     }
     closeSuggestions()
     void runSearch({ queryOverride: normalized, searchTypeOverride: derivedType, indexerIdsOverride: restoredIndexerIds })
-  }, [closeSuggestions, indexers, runSearch, validateSearchInputs])
+  }, [closeSuggestions, indexers, runSearch, setSearchType, validateSearchInputs])
 
   const handleDownload = useCallback((result: TorznabSearchResult) => {
     window.open(result.downloadUrl, "_blank", "noopener,noreferrer")
