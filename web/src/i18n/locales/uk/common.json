@@ -53,6 +53,8 @@
     "smartSearchGlobExamples": "*.mkv, *1080p*, *S[0-9][0-9]E[0-9][0-9]*",
     "smartSearchFuzzy": "Нечіткий пошук:",
     "smartSearchFuzzyExample": "\"breaking bad\" знайде \"Breaking.Bad\"",
+    "smartSearchExclude": "Виключення слів:",
+    "smartSearchExcludeExample": "\"1080p -cam\" приховує назви, що містять \"cam\"",
     "smartSearchDots": "Обробляє крапки, підкреслення та дужки",
     "smartSearchFields": "Пошук за назвою, категорією та тегами",
     "smartSearchEnter": "Натисніть Enter для миттєвого пошуку",

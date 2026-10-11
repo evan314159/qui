@@ -51,7 +51,7 @@ Click **Advanced** to send extra Torznab parameters. A search with advanced para
 
 Results appear in a table with the columns Title, Indexer, Size, Seeders, Category, Source, Collection, Group, Freeleech, and Published. By default, the table sorts by seeders. Click a column header to change the sort.
 
-The filter box narrows the visible results by title, indexer, category, source, collection, or group. Column filters provide per-column matching and include a freeleech filter for free and partial-discount results.
+The filter box narrows the visible results by title, indexer, category, source, collection, or group, with the same rules as qBittorrent's filter box. Every word you type must match, in any of those fields, without regard to case. Start a word with `-` to hide results that contain it: `1080p -cam` keeps results that contain `1080p` and hides any that contain `cam`. A word that starts with `+` must match, as a plain word already does. A `-` or `+` on its own is ignored. Column filters provide per-column matching and include a freeleech filter for free and partial-discount results.
 
 ## Send a result to an instance
 
