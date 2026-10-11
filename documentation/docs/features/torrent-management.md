@@ -53,6 +53,12 @@ qBittorrent stores a subcategory as a name with `/` separators, for example `med
 
 Click a status, category, tag, or tracker in the filter sidebar to show only the torrents that match it. Ctrl+click the same item (Cmd+click on macOS) to exclude it instead. The list then shows the torrents that do not match. On a touch screen, press and hold the item for the same result. Click it again to clear the exclusion.
 
+## Exclude words from a search
+
+The search box follows the same rules as qBittorrent's filter box. Start a word with `-` to hide torrents that contain it. `1080p -cam` shows torrents that match `1080p` and hides any whose name, category, or tags contain `cam`. A word is plain text without regard to case, so `-web-dl` hides `Show.WEB-DL` but not `Show.WEB.DL`. A search of only exclusions, such as `-cam`, hides those torrents and shows the rest.
+
+A word that starts with `+` must match, as a plain word already does. A `-` or `+` on its own is ignored. Only a `-` or `+` at the start of a word counts, so `x264-GRP` and `Spider-Man` search as usual. Exclusions match plain text, so `*` and `?` in an excluded word have no special meaning.
+
 ## Clear filters
 
 Click **Clear filters** at the top of the filter sidebar to remove sidebar and column filters. The button appears when either group has active filters. Search text and sorting stay unchanged.

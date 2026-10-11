@@ -53,6 +53,8 @@
     "smartSearchGlobExamples": "*.mkv, *1080p*, *S[0-9][0-9]E[0-9][0-9]*",
     "smartSearchFuzzy": "유사 일치:",
     "smartSearchFuzzyExample": "\"breaking bad\"로 \"Breaking.Bad\"를 찾습니다",
+    "smartSearchExclude": "단어 제외:",
+    "smartSearchExcludeExample": "\"1080p -cam\"은 \"cam\"이 포함된 이름을 숨깁니다",
     "smartSearchDots": "점, 밑줄, 대괄호를 처리합니다",
     "smartSearchFields": "이름, 카테고리, 태그를 검색합니다",
     "smartSearchEnter": "Enter를 눌러 즉시 검색",

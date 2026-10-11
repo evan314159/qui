@@ -4495,8 +4495,14 @@ func rankFuzzy(source, target string, sourceIsFolded bool) int {
 	return -1
 }
 
-// filterTorrentsBySearch filters torrents by search string with smart matching
+// filterTorrentsBySearch filters torrents by search string with smart matching.
+// A word that starts with "-" excludes torrents containing it instead.
 func (sm *SyncManager) filterTorrentsBySearch(torrents []qbt.Torrent, search string) []qbt.Torrent {
+	search, excluded := splitSearchTerms(search)
+	if len(excluded) > 0 {
+		torrents = dropExcludedTorrents(torrents, excluded)
+	}
+
 	if search == "" {
 		return torrents
 	}
