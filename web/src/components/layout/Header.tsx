@@ -744,6 +744,7 @@ export function Header({
                       <ul className="space-y-1 ml-2">
                         <li>• <strong>{t("header.smartSearchGlob")}</strong> {t("header.smartSearchGlobExamples")}</li>
                         <li>• <strong>{t("header.smartSearchFuzzy")}</strong> {t("header.smartSearchFuzzyExample")}</li>
+                        <li>• <strong>{t("header.smartSearchExclude")}</strong> {t("header.smartSearchExcludeExample")}</li>
                         <li>• {t("header.smartSearchDots")}</li>
                         <li>• {t("header.smartSearchFields")}</li>
                         <li>• {t("header.smartSearchEnter")}</li>

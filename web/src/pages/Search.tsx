@@ -25,6 +25,7 @@ import type { ColumnFilter } from "@/lib/column-filter-utils"
 import { filterSearchResult } from "@/lib/column-filter-utils"
 import { getCategoriesForSearchType, getSearchTypeLabel, getSearchTypeOptions, inferSearchTypeFromCategories, resolveSuggestionIndexerIds, type SearchType } from "@/lib/search-derived-params"
 import { extractImdbId, extractTvdbId } from "@/lib/search-id-parsing"
+import { filterBySearchText } from "@/lib/search-terms"
 import { cn, formatBytes } from "@/lib/utils"
 import type { TorznabIndexer, TorznabRecentSearch, TorznabSearchRequest, TorznabSearchResponse, TorznabSearchResult } from "@/types"
 import { Link } from "@tanstack/react-router"
@@ -746,15 +747,14 @@ export function Search() {
 
     // Apply search filter
     if (resultsFilter.trim()) {
-      const filter = resultsFilter.toLowerCase()
-      filtered = filtered.filter(result =>
-        result.title.toLowerCase().includes(filter) ||
-        result.indexer.toLowerCase().includes(filter) ||
-        (categoryMap.get(result.categoryId) || result.categoryName || "").toLowerCase().includes(filter) ||
-        (result.source || "").toLowerCase().includes(filter) ||
-        (result.collection || "").toLowerCase().includes(filter) ||
-        (result.group || "").toLowerCase().includes(filter)
-      )
+      filtered = filterBySearchText(filtered, resultsFilter, result => [
+        result.title,
+        result.indexer,
+        categoryMap.get(result.categoryId) || result.categoryName || "",
+        result.source || "",
+        result.collection || "",
+        result.group || "",
+      ])
     }
 
     // Apply sorting
