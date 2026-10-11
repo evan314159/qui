@@ -57,6 +57,7 @@ const SYNCED_KEYS = new Set<string>([
   "qui-unified-instance-filter",
   "torrent-details-last-tab",
   "qui-log-levels",
+  "qui-search-type",
 ])
 const SYNCED_PREFIXES = [
   "qui-start-paused-instance-",
