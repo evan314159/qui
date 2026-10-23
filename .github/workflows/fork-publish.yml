@@ -22,6 +22,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Short SHA
+        id: sha
+        run: echo "short=${GITHUB_SHA::8}" >> "$GITHUB_OUTPUT"
+
       - name: Build and push
         id: push
         uses: docker/build-push-action@v7.4.0
@@ -29,11 +33,23 @@ jobs:
           context: .
           file: distrib/docker/Dockerfile
           platforms: linux/amd64
+          # One package version per build, so retention counts images, not attestations.
+          provenance: false
+          sbom: false
           build-args: |
-            VERSION=v1.31.1-search-resizable-columns
+            VERSION=v1.31.1-combined-${{ steps.sha.outputs.short }}
             GIT_COMMIT=${{ github.sha }}
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/qui:search-resizable-columns
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/qui:combined
+            ghcr.io/${{ github.repository_owner }}/qui:combined-${{ steps.sha.outputs.short }}
 
       - name: Print digest
         run: echo "digest=${{ steps.push.outputs.digest }}"
+
+      - name: Keep the last 5 images
+        uses: actions/delete-package-versions@v5.0.0
+        with:
+          package-name: qui
+          package-type: container
+          min-versions-to-keep: 5
