@@ -69,6 +69,13 @@ describe("filterResults", () => {
     expect(filterResults(results, "2160p", { freeleech: ["0"] }, categoryName).map(r => r.guid)).toEqual(["a"])
     expect(filterResults([result({ guid: "d" })], "", { group: ["RIG"] }, categoryName)).toEqual([])
   })
+
+  it("hides the results that contain a word that starts with - or !, and reads +word as word", () => {
+    expect(filterResults(results, "film -web-dl", {}, categoryName).map(r => r.guid)).toEqual(["a"])
+    expect(filterResults(results, "!bithaven", {}, categoryName).map(r => r.guid)).toEqual(["a"])
+    expect(filterResults(results, "+another -", {}, categoryName).map(r => r.guid)).toEqual(["c"])
+    expect(filterResults(results, "web-dl", {}, categoryName).map(r => r.guid)).toEqual(["b", "c"])
+  })
 })
 
 describe("facetOptions", () => {
