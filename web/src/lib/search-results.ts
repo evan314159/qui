@@ -125,18 +125,34 @@ export function facetOptions(results: TorznabSearchResult[], facet: FacetKey, ca
 }
 
 export function filterResults(results: TorznabSearchResult[], text: string, facets: FacetSelection, categoryName: CategoryName): TorznabSearchResult[] {
-  const needles = text.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const { needles, excluded } = parseFilterText(text)
   const active = FACETS.filter(facet => (facets[facet]?.length ?? 0) > 0).map(facet => [facet, new Set(facets[facet])] as const)
-  if (needles.length === 0 && active.length === 0) return results
+  if (needles.length === 0 && excluded.length === 0 && active.length === 0) return results
   return results.filter(result => {
     for (const [facet, values] of active) {
       const value = facetValue(result, facet, categoryName)
       if (value === undefined || !values.has(value)) return false
     }
-    if (needles.length === 0) return true
+    if (needles.length === 0 && excluded.length === 0) return true
     const haystack = `${result.title} ${result.indexer} ${categoryName(result)} ${result.group ?? ""}`.toLowerCase()
-    return needles.every(needle => haystack.includes(needle))
+    return needles.every(needle => haystack.includes(needle)) && !excluded.some(term => haystack.includes(term))
   })
+}
+
+function parseFilterText(text: string): { needles: string[], excluded: string[] } {
+  const needles: string[] = []
+  const excluded: string[] = []
+  for (const word of text.toLowerCase().split(/\s+/).filter(Boolean)) {
+    const rest = word.slice(1)
+    if (word.startsWith("-") || word.startsWith("!")) {
+      if (rest !== "") excluded.push(rest)
+    } else if (word.startsWith("+") && rest !== "") {
+      needles.push(rest)
+    } else {
+      needles.push(word)
+    }
+  }
+  return { needles, excluded }
 }
 
 export const SORT_KEYS = ["seeders", "published", "size", "title", "indexer"] as const

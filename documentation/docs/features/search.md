@@ -51,7 +51,7 @@ Click **Advanced** to send extra Torznab parameters. A search with advanced para
 
 Results appear in a table with the columns Title, Indexer, Size, Seeders, Leechers, and Age. On a narrow screen, the values that do not fit in a column show under the title. By default, the table sorts by seeders. To change the sort, click a column header. On a narrow screen, use the **Sort** menu.
 
-The filter box narrows the results to the rows that contain each word that you type. It looks at the title, the indexer, the category, and the group.
+The filter box narrows the results to the rows that contain each word that you type. It looks at the title, the indexer, the category, and the group. A word that starts with `-` or `!` hides the rows that contain it: `1080p -cam` keeps the rows with `1080p` and hides any with `cam`. A word that starts with `+` searches like the word without it, and a lone `-` or `!` is ignored. Only the start of a word counts, so `web-dl` finds `WEB-DL` as before.
 
 The buttons next to the filter box narrow the results by **Indexer**, **Category**, **Source**, **Service**, **Group**, or **Freeleech**. Each button opens a list of the values in the results, with the number of results for each value. A button shows only when the results have two or more values for it.
 
